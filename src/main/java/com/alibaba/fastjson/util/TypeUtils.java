@@ -64,6 +64,8 @@ import com.alibaba.fastjson.serializer.SerializeBeanInfo;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 
 /**
+ * 类相关工具，提供各种值的具体类型的转换方式
+ * A type-related utility class to various casting method for values
  * @author wenshao[szujobs@hotmail.com]
  */
 public class TypeUtils {
@@ -1084,6 +1086,15 @@ public class TypeUtils {
         return new SerializeBeanInfo(beanType, jsonType, typeName, features, fields, sortedFields);
     }
 
+    /**
+     * @param clazz     class to compute
+     * @param jsonType  special serialize/deserialize options
+     * @param aliasMap  map to record aliasMap
+     * @param sorted    return a sorted-order result
+     * @return a list of FieldInfo to record fields of the given class. See {@link com.alibaba.fastjson.util.FieldInfo FieldInfo}
+     *         <br> 返回记录给定类的域的信息的FieldInfo列表
+     *         
+     */
     public static List<FieldInfo> computeGetters(Class<?> clazz, // 
                                                  JSONType jsonType, // 
                                                  Map<String, String> aliasMap, //
@@ -1302,9 +1313,12 @@ public class TypeUtils {
             }
         }
 
-        for (Field field : clazz.getFields()) {
+        for (Field field : clazz.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) {
                 continue;
+            }
+            if(field.getName().startsWith("this$")){//跳过包含自身的类外部类引用
+            	continue;
             }
 
             JSONField fieldAnnotation = field.getAnnotation(JSONField.class);
@@ -1640,7 +1654,7 @@ public class TypeUtils {
         } else if (type instanceof ParameterizedType) {
             return getRawClass(((ParameterizedType) type).getRawType());
         } else {
-            throw new JSONException("TODO");
+            throw new JSONException("TODO");//TODO:TypeVariable、GenericArrayType、WildcardType unhandled?
         }
     }
 }

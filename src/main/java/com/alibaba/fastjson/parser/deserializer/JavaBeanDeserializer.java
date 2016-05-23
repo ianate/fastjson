@@ -31,6 +31,7 @@ public class JavaBeanDeserializer implements ObjectDeserializer {
     protected final FieldDeserializer[] sortedFieldDeserializers;
     protected final Class<?>            clazz;
     public final JavaBeanInfo           beanInfo;
+    private final Map<String, Object> outterInstances = new HashMap<String, Object>();//thread-safe? the map should behave like a stack corresponding to token,any better way?
     
     public JavaBeanDeserializer(ParserConfig config, Class<?> clazz) {
         this(config, clazz, clazz);
@@ -291,6 +292,8 @@ public class JavaBeanDeserializer implements ObjectDeserializer {
                 parser.resolveStatus = DefaultJSONParser.NONE;
             }
 
+            if(object != null) outterInstances.put(object.getClass().getName(), object);
+            
             for (int fieldIndex = 0;; fieldIndex++) {
                 String key = null;
                 FieldDeserializer fieldDeser = null;
@@ -484,6 +487,8 @@ public class JavaBeanDeserializer implements ObjectDeserializer {
                     object = createInstance(parser, type);
                     if (object == null) {
                         fieldValues = new HashMap<String, Object>(this.fieldDeserializers.length);
+                    }else{
+                    	outterInstances.put(object.getClass().getName(), object);
                     }
                     childContext = parser.setContext(context, object, fieldName);
                 }

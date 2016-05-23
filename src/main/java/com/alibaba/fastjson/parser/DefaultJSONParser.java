@@ -33,6 +33,8 @@ import static com.alibaba.fastjson.parser.JSONToken.TRUE;
 import static com.alibaba.fastjson.parser.JSONToken.UNDEFINED;
 
 import java.io.Closeable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -1451,21 +1453,61 @@ public class DefaultJSONParser implements Closeable {
         }
     }
     
-    public void parseExtra(Object object, String key) {
+    public void parseExtra(Object object, String key, Map<String, Object> outterInstances) {
         final JSONLexer lexer = this.lexer; // xxx
         lexer.nextTokenWithColon();
         Type type = null;
         
         if (extraTypeProviders != null) {
             for (ExtraTypeProvider extraProvider : extraTypeProviders) {
-                type = extraProvider.getExtraType(object, key);
+                type = extraProvider.getExtraType(object, key);//替代之前FilterUtils的静态方法，下同
             }
         }
-        Object value = type == null //
+        /*Object value = type == null //
             ? parse() // skip
-            : parseObject(type);
+            : parseObject(type);*/
+        Object value;
+        if (type == null) {
+        	if(key != null){//non-static inner class handling 尝试处理非静态内部类
+	        	Field[] fields = object.getClass().getDeclaredFields();
+	        	for(Field field : fields){
+	        		if(key.equals(field.getName())){
+	        			String fieldTypeName = field.getType().getName();
+	        			if(fieldTypeName.contains("$")){//ugly way to judge inner. any better way?
+	        				String outterClsName = fieldTypeName.substring(0, fieldTypeName.lastIndexOf("$"));//may cause memory leakage before java 7
+	        				Object outter = outterInstances.get(outterClsName);
+	        				if(outter != null){
+	        					Class<?> outterCls = outter.getClass();
+	        					Constructor<?> innerClsConstructor = null;
+	        					try{
+	        						Class<?> innerCls  = field.getType();
+	        						innerClsConstructor = innerCls.getDeclaredConstructor(outterCls);
+	        					}catch(NoSuchMethodException noMethodException){
+	        						throw new RuntimeException("Field "+field.getName()+" has no valid constructor");
+	        					}
+	        					if(!innerClsConstructor.isAccessible()){
+	        						innerClsConstructor.setAccessible(true);
+	        					}
+	        					try{
+	        						value = innerClsConstructor.newInstance(outter);
+	        						break;
+	        					}catch(Exception e){
+	        						//skip
+	        					}
+	        				}else{
+	        					throw new RuntimeException("unsupported inner");
+	        				}
+	        				
+	        			}
+	        		}
+	        	}
+        	}
+            value = parse(); // skip
+        } else {
+            value = parseObject(type);
+        }
             
-        if (object instanceof ExtraProcessable) {
+        if (object instanceof ExtraProcessable) {//FilterUtils
             ExtraProcessable extraProcessable = ((ExtraProcessable) object);
             extraProcessable.processExtra(key, value);
             return;

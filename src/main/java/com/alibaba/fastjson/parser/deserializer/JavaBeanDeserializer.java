@@ -109,7 +109,20 @@ public class JavaBeanDeserializer implements ObjectDeserializer {
                 object = constructor.newInstance();
             } else {
                 ParseContext context = parser.getContext();
-                String parentName = context.object.getClass().getName();
+                String parentName = null;
+                Object outtest;
+                if(context != null){
+                	parentName = context.object.getClass().getName();
+                	outtest = context.object;
+                }else{
+                	parentName = type.getTypeName().split("\\$")[0];
+                	Class<?> cls = Class.forName(parentName);
+                	Constructor<?> c = cls.getDeclaredConstructor();
+                	if(!c.isAccessible()){
+                		c.setAccessible(true);
+                	}
+                	outtest = c.newInstance();
+                }
                 String typeName = type.getTypeName();
               
                 if(parentName.length() != typeName.lastIndexOf('$') - 1){
@@ -117,7 +130,7 @@ public class JavaBeanDeserializer implements ObjectDeserializer {
                 	StringBuilder clsNameBuilder = new StringBuilder();
                 	clsNameBuilder.append(parentName).append("$");
                 	Map<String, Object> outterCached = new HashMap<String, Object>();
-                	outterCached.put(parentName, context.object);//outtest
+                	outterCached.put(parentName, outtest);//outtest
     				for(int i = parentName.length() + 1;  i <= typeName.lastIndexOf('$'); i ++){
     					char thisChar = typeChars[i];
     					if(thisChar == '$'){
